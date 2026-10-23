@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os/exec"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -29,7 +31,13 @@ func (t Tools) Restore(ctx context.Context, dsn string, r io.Reader, o RestoreOp
 	if err != nil {
 		return err
 	}
-	args := []string{"--single-transaction", "--exit-on-error"}
+	// pg_restore does not read PGDATABASE, so the name goes on the command line.
+	// The rest of the connection (host, user, password) comes from the environment.
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return fmt.Errorf("bad database url: %w", err)
+	}
+	args := []string{"--single-transaction", "--exit-on-error", "--dbname=" + strings.TrimPrefix(u.Path, "/")}
 	if o.NoOwner {
 		args = append(args, "--no-owner")
 	}
