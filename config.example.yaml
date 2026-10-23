@@ -1,0 +1,61 @@
+# pg-backup config. Copy to pg-backup.yaml (or point PGBACKUP_CONFIG at it).
+#
+# Everything here can be overridden by an environment variable, listed in the
+# README. Secrets are not read from this file at all: put them in the
+# environment (see .env.example). A "password:" key here is an error.
+
+database:
+  # The password comes from PGBACKUP_DB_PASSWORD.
+  url: postgres://postgres@localhost:5433/toko_maju
+
+storage:
+  # Any S3-compatible service: AWS S3, MinIO, Cloudflare R2, Backblaze B2.
+  endpoint: localhost:9010
+  bucket: pg-backups
+  region: us-east-1
+  prefix: pg-backup
+  use_ssl: false
+
+encryption:
+  # Public key, safe to commit. Make a pair with: pg-backup keygen
+  recipient: ""
+
+# Keep the newest backup of each of the last N days, ISO weeks and months
+# that have one. A backup is kept if any rule keeps it.
+retention:
+  daily: 7
+  weekly: 4
+  monthly: 6
+
+verify:
+  # Where scratch databases are created. Default: the server in database.url.
+  scratch_url: ""
+  # Each query runs read-only against the restored copy and must return one
+  # boolean. false (or an error) fails the drill.
+  checks:
+    - name: every order has a customer
+      sql: >
+        SELECT NOT EXISTS (
+          SELECT 1 FROM orders o LEFT JOIN customers c ON c.id = o.customer_id
+          WHERE c.id IS NULL)
+    - name: order totals match their items
+      sql: >
+        SELECT NOT EXISTS (
+          SELECT 1 FROM orders o
+          JOIN (SELECT order_id, sum(qty * unit_price_idr) AS s FROM order_items GROUP BY order_id) i
+            ON i.order_id = o.id
+          WHERE o.total_idr <> i.s)
+
+serve:
+  schedule: "0 3 * * *" # standard 5-field cron, server time (UTC in the container)
+  listen: 127.0.0.1:9187
+  verify: true # run the restore drill after every backup
+  prune: false # apply the retention policy after a passing drill
+
+notify:
+  # Needs PGBACKUP_TELEGRAM_TOKEN and PGBACKUP_TELEGRAM_CHAT_ID in the environment.
+  telegram: false
+
+postgres:
+  # Only if pg_dump and pg_restore (version 17) are not on PATH.
+  bin_dir: ""
