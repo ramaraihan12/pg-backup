@@ -35,10 +35,12 @@ func (r *Restorer) Restore(ctx context.Context, m *manifest.Manifest, targetDSN 
 	defer body.Close()
 
 	dec, err := pipeline.NewDecoder(body, r.Identities...)
-	defer dec.Close()
 	if err != nil {
+		// Nothing was started that needs closing, but dec can still tell us
+		// whether the stored bytes were damaged.
 		return explain(dec, m, err)
 	}
+	defer dec.Close()
 
 	restoreErr := r.Tools.Restore(ctx, targetDSN, dec, opts)
 	if restoreErr == nil {

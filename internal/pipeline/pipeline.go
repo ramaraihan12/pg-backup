@@ -138,10 +138,10 @@ type Decoder struct {
 // header) the returned Decoder is still non-nil, so VerifyStored can tell
 // whether the stored bytes were damaged.
 func NewDecoder(src io.Reader, identities ...age.Identity) (*Decoder, error) {
-	if len(identities) == 0 {
-		return nil, errors.New("no age identity given")
-	}
 	d := &Decoder{stored: newTally(), raw: newTally()}
+	if len(identities) == 0 {
+		return d, errors.New("no age identity given")
+	}
 	d.src = &tallyReader{t: d.stored, src: src}
 	ar, err := age.Decrypt(d.src, identities...)
 	if err != nil {
