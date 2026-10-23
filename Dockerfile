@@ -13,12 +13,12 @@ ARG VERSION=dev
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/pg-backup ./cmd/pg-backup
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/ ./cmd/pg-backup ./cmd/demodata
 
 FROM alpine:${ALPINE_VERSION} AS runtime
 RUN apk add --no-cache postgresql17-client ca-certificates tzdata \
     && adduser -D -u 10001 app
-COPY --from=build /out/pg-backup /usr/local/bin/pg-backup
+COPY --from=build /out/pg-backup /out/demodata /usr/local/bin/
 USER app
 EXPOSE 9187
 ENTRYPOINT ["pg-backup"]
