@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - run: test -z "$(gofmt -l .)" || (gofmt -d . && exit 1)
+
+      - run: go vet ./...
+
+      - run: go tool staticcheck ./...
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - run: go build ./...
+
+      - run: go test -short -race ./...
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_BIN_DIR: /usr/lib/postgresql/17/bin
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # Runners ship Postgres 16 tools, and pg_dump refuses a newer server.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      # Starts Postgres 17 and MinIO with testcontainers.
+      - run: go test -race -timeout 15m ./internal/integration/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: docker build -t pg-backup .
