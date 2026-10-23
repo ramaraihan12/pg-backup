@@ -138,9 +138,13 @@ func Serve(ctx context.Context, o Options, job *Job) error {
 	}
 	log.Info("shutting down")
 	<-c.Stop().Done() // a running job sees the cancelled ctx and stops
-	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	sctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	return srv.Shutdown(sctx)
+	if err := srv.Shutdown(sctx); err != nil {
+		// A client still holding a connection open must not hold up the exit.
+		_ = srv.Close()
+	}
+	return nil
 }
 
 type cronLogger struct{ log *slog.Logger }

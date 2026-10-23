@@ -171,7 +171,7 @@ func TestServeRunsOnStartAndStops(t *testing.T) {
 	go func() { done <- Serve(ctx, Options{Schedule: "0 3 * * *", Listen: addr, RunNow: true}, job) }()
 
 	waitFor(t, func() bool {
-		resp, err := http.Get("http://" + addr + "/healthz")
+		resp, err := client.Get("http://" + addr + "/healthz")
 		if err != nil {
 			return false
 		}
@@ -217,7 +217,7 @@ func waitFor(t *testing.T, cond func() bool) {
 
 func scrapeURL(t *testing.T, url string) string {
 	t.Helper()
-	resp, err := http.Get(url)
+	resp, err := client.Get(url)
 	if err != nil {
 		return ""
 	}
@@ -225,3 +225,6 @@ func scrapeURL(t *testing.T, url string) string {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b)
 }
+
+// A client that does not keep connections open, so shutdown is not held up by it.
+var client = &http.Client{Transport: &http.Transport{DisableKeepAlives: true}, Timeout: 3 * time.Second}
