@@ -1,0 +1,75 @@
+# Example stack: Postgres, MinIO and pg-backup serve.
+#
+#   cp .env.example .env        # then add a key pair, see the comments inside
+#   docker compose up -d
+#   docker compose --profile demo run --rm seed      # optional: made-up shop data
+#   docker compose exec pg-backup pg-backup backup
+#
+# Ports are published on 127.0.0.1 only, so nothing here is reachable from the network.
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: ${PGBACKUP_DB_PASSWORD:-postgres}
+      POSTGRES_DB: toko_maju
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d toko_maju"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: chainguard/minio@sha256:d88920d6a50bd0b088223b688be3b76c63e6205dbe494437f67ba1240ea12880
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${PGBACKUP_S3_ACCESS_KEY:-pgbackup}
+      MINIO_ROOT_PASSWORD: ${PGBACKUP_S3_SECRET_KEY:-pgbackup-secret}
+    ports:
+      - "127.0.0.1:9010:9000"
+      - "127.0.0.1:9011:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "/usr/bin/mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pg-backup:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PGBACKUP_CONFIG: /etc/pg-backup/config.yaml
+      PGBACKUP_DATABASE_URL: postgres://postgres@db:5432/toko_maju
+      PGBACKUP_S3_ENDPOINT: minio:9000
+      PGBACKUP_LISTEN: 0.0.0.0:9187
+    volumes:
+      - ./config.example.yaml:/etc/pg-backup/config.yaml:ro
+    ports:
+      - "127.0.0.1:9187:9187"
+
+  # One-off: fills the database with made-up data. Run with --profile demo.
+  seed:
+    build: .
+    profiles: ["demo"]
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["demodata"]
+    command: ["-url", "postgres://postgres:postgres@db:5432/toko_maju", "-customers", "20000", "-orders", "80000", "-reset"]
+
+volumes:
+  db-data:
+  minio-data:
