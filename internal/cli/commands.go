@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -219,9 +220,9 @@ func printReport(w io.Writer, r *verify.Report) {
 	}
 	for _, c := range r.Checks {
 		if c.OK {
-			fmt.Fprintf(w, "  check %-30q ok\n", c.Name)
+			fmt.Fprintf(w, "  check %-40s ok\n", strconv.Quote(c.Name))
 		} else {
-			fmt.Fprintf(w, "  check %-30q FAIL (%s)\n", c.Name, c.Detail)
+			fmt.Fprintf(w, "  check %-40s FAIL (%s)\n", strconv.Quote(c.Name), c.Detail)
 		}
 	}
 	if r.Scratch != "" {
