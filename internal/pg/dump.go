@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 
 	"github.com/ramaraihan12/pg-backup/internal/manifest"
 
@@ -61,6 +62,7 @@ func (t Tools) Dump(ctx context.Context, dsn string, w io.Writer) (*DumpInfo, er
 	if err := tx.QueryRow(ctx, "SHOW server_version").Scan(&info.ServerVersion); err != nil {
 		return nil, fmt.Errorf("read server version: %w", err)
 	}
+	info.ServerVersion = shortVersion(info.ServerVersion)
 
 	// Count rows while pg_dump runs. The transaction is used by this one
 	// goroutine only, until we receive from done.
@@ -95,4 +97,12 @@ func (t Tools) Dump(ctx context.Context, dsn string, w io.Writer) (*DumpInfo, er
 	}
 	info.Tables = c.tables
 	return info, nil
+}
+
+// shortVersion drops the distro suffix: "17.11 (Debian 17.11-1.pgdg12+2)" becomes "17.11".
+func shortVersion(v string) string {
+	if f := strings.Fields(v); len(f) > 0 {
+		return f[0]
+	}
+	return v
 }

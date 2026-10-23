@@ -71,3 +71,15 @@ func TestToolsMissingBinary(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func TestShortVersion(t *testing.T) {
+	for in, want := range map[string]string{
+		"17.11 (Debian 17.11-1.pgdg12+2)": "17.11",
+		"16.4":                            "16.4",
+		"":                                "",
+	} {
+		if got := shortVersion(in); got != want {
+			t.Errorf("shortVersion(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
