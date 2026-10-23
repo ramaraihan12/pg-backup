@@ -6,7 +6,7 @@
 
 database:
   # The password comes from PGBACKUP_DB_PASSWORD.
-  url: postgres://postgres@localhost:5433/toko_maju
+  url: postgres://postgres@localhost:5433/pgbackup_demo
 
 storage:
   # Any S3-compatible service: AWS S3, MinIO, Cloudflare R2, Backblaze B2.

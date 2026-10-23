@@ -12,13 +12,13 @@ services:
     image: postgres:17
     environment:
       POSTGRES_PASSWORD: ${PGBACKUP_DB_PASSWORD:-postgres}
-      POSTGRES_DB: toko_maju
+      POSTGRES_DB: pgbackup_demo
     ports:
       - "127.0.0.1:5442:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d toko_maju"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pgbackup_demo"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -52,7 +52,7 @@ services:
         required: false
     environment:
       PGBACKUP_CONFIG: /etc/pg-backup/config.yaml
-      PGBACKUP_DATABASE_URL: postgres://postgres@db:5432/toko_maju
+      PGBACKUP_DATABASE_URL: postgres://postgres@db:5432/pgbackup_demo
       PGBACKUP_S3_ENDPOINT: minio:9000
       PGBACKUP_LISTEN: 0.0.0.0:9187
     volumes:
@@ -68,7 +68,7 @@ services:
       db:
         condition: service_healthy
     entrypoint: ["demodata"]
-    command: ["-url", "postgres://postgres:postgres@db:5432/toko_maju", "-customers", "20000", "-orders", "80000", "-reset"]
+    command: ["-url", "postgres://postgres:postgres@db:5432/pgbackup_demo", "-customers", "20000", "-orders", "80000", "-reset"]
 
 volumes:
   db-data:
