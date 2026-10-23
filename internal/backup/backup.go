@@ -49,12 +49,9 @@ func (b *Backuper) Run(ctx context.Context) (*manifest.Manifest, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// The upload must already be reading when the encoder is created, because
+	// age writes its header to the pipe straight away.
 	pr, pw := io.Pipe()
-	enc, err := pipeline.NewEncoder(pw, b.Recipients...)
-	if err != nil {
-		return nil, err
-	}
-
 	uploadDone := make(chan error, 1)
 	go func() {
 		err := c.Store.Put(ctx, objectKey, pr)
@@ -65,6 +62,13 @@ func (b *Backuper) Run(ctx context.Context) (*manifest.Manifest, error) {
 		}
 		uploadDone <- err
 	}()
+
+	enc, err := pipeline.NewEncoder(pw, b.Recipients...)
+	if err != nil {
+		pw.CloseWithError(err)
+		<-uploadDone
+		return nil, err
+	}
 
 	log.Info("backup started", "database", c.Database, "id", id)
 	info, dumpErr := b.Tools.Dump(ctx, b.DatabaseURL, enc)
