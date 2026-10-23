@@ -1,0 +1,18 @@
+# go
+/bin/
+/pg-backup
+*.test
+*.out
+coverage.txt
+
+# local config and secrets
+.env
+config.yaml
+!config.example.yaml
+*.age-key
+
+# editors
+.vscode/
+.idea/
+.cursor/
+.DS_Store
