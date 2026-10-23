@@ -134,7 +134,9 @@ type Decoder struct {
 	done   bool
 }
 
-// NewDecoder decrypts and decompresses src.
+// NewDecoder decrypts and decompresses src. When it fails (wrong key, damaged
+// header) the returned Decoder is still non-nil, so VerifyStored can tell
+// whether the stored bytes were damaged.
 func NewDecoder(src io.Reader, identities ...age.Identity) (*Decoder, error) {
 	if len(identities) == 0 {
 		return nil, errors.New("no age identity given")
@@ -143,11 +145,11 @@ func NewDecoder(src io.Reader, identities ...age.Identity) (*Decoder, error) {
 	d.src = &tallyReader{t: d.stored, src: src}
 	ar, err := age.Decrypt(d.src, identities...)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt: %w", err)
+		return d, fmt.Errorf("decrypt: %w", err)
 	}
 	zr, err := zstd.NewReader(ar, zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxWindow(64<<20))
 	if err != nil {
-		return nil, fmt.Errorf("start zstd: %w", err)
+		return d, fmt.Errorf("start zstd: %w", err)
 	}
 	d.ar, d.zr = ar, zr
 	return d, nil
@@ -169,7 +171,11 @@ func (d *Decoder) Read(p []byte) (int, error) {
 }
 
 // Close releases decoder goroutines. It does not close the source.
-func (d *Decoder) Close() { d.zr.Close() }
+func (d *Decoder) Close() {
+	if d.zr != nil {
+		d.zr.Close()
+	}
+}
 
 // RawBytes is the number of plaintext bytes read so far.
 func (d *Decoder) RawBytes() int64 { return d.raw.n }
