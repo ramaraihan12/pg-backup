@@ -246,13 +246,13 @@ func (c *Config) DatabaseName() (string, error) {
 
 // DatabaseURL is the source URL with PGBACKUP_DB_PASSWORD filled in when the URL has none.
 func (c *Config) DatabaseURL() (string, error) {
-	return withPassword(c.Database.URL, c.Secrets.DBPassword)
+	return WithPassword(c.Database.URL, c.Secrets.DBPassword)
 }
 
 // ScratchURL is the server used for restore drills.
 func (c *Config) ScratchURL() (string, error) {
 	if c.Verify.ScratchURL != "" {
-		return withPassword(c.Verify.ScratchURL, c.Secrets.DBPassword)
+		return WithPassword(c.Verify.ScratchURL, c.Secrets.DBPassword)
 	}
 	return c.DatabaseURL()
 }
@@ -304,7 +304,8 @@ func parseURL(raw string) (*url.URL, error) {
 	return u, nil
 }
 
-func withPassword(raw, password string) (string, error) {
+// WithPassword fills password into a postgres URL that has a user but no password.
+func WithPassword(raw, password string) (string, error) {
 	u, err := parseURL(raw)
 	if err != nil {
 		return "", err
