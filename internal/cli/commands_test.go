@@ -69,7 +69,7 @@ func report(passed bool, failures ...string) *verify.Report {
 	return &verify.Report{
 		Backup:  &manifest.Manifest{ID: "20261023T030000Z", Database: "pgbackup_demo", StoredBytes: 5 << 20, Tables: []manifest.Table{{Schema: "public", Name: "orders", Rows: 10}}},
 		Scratch: "pgbackup_verify_x", Passed: passed, Failures: failures,
-		RestoreTime: 2 * time.Second, Total: 3 * time.Second,
+		Restored: true, RestoreTime: 2 * time.Second, Total: 3 * time.Second,
 		Tables: []verify.TableResult{{Table: "public.orders", Expected: 10, Actual: 10, OK: true}},
 		Checks: []verify.CheckResult{{Name: "orders have customers", OK: true}},
 	}
@@ -99,5 +99,16 @@ func TestPrintReportFail(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+func TestPrintReportRestoredWithNoTables(t *testing.T) {
+	r := report(true)
+	r.Tables = nil
+	r.Restored = true
+	var out bytes.Buffer
+	printReport(&out, r)
+	if strings.Contains(out.String(), "restore           FAIL") {
+		t.Errorf("a restore that worked must not print FAIL:\n%s", out.String())
 	}
 }

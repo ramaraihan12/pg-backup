@@ -206,8 +206,7 @@ func printReport(w io.Writer, r *verify.Report) {
 	if r.Scratch != "" {
 		fmt.Fprintf(w, "  scratch database  %s\n", r.Scratch)
 	}
-	restoreOK := r.RestoreTime > 0 && len(r.Tables) > 0
-	fmt.Fprintf(w, "  restore           %s  %s\n", status(restoreOK), seconds(r.RestoreTime))
+	fmt.Fprintf(w, "  restore           %s  %s\n", status(r.Restored), seconds(r.RestoreTime))
 	if len(r.Tables) > 0 {
 		fmt.Fprintf(w, "  row counts        %s  %s\n", status(allTablesOK(r)), seconds(r.CountTime))
 		for _, t := range r.Tables {

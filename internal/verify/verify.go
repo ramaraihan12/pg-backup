@@ -48,6 +48,9 @@ type Report struct {
 	Passed   bool
 	Failures []string
 
+	// Restored is true when pg_restore and the checksum check succeeded.
+	Restored bool
+
 	Tables []TableResult
 	Checks []CheckResult
 
@@ -99,6 +102,7 @@ func (d *Drill) Run(ctx context.Context, m *manifest.Manifest) *Report {
 		fail("restore: %v", err)
 		return r
 	}
+	r.Restored = true
 
 	t = time.Now()
 	actual, err := pg.CountRestored(ctx, scratchDSN)
