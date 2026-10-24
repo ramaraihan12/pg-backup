@@ -154,3 +154,14 @@ func TestEncoderNeedsRecipient(t *testing.T) {
 		t.Fatal("expected an error without recipients")
 	}
 }
+
+func TestNoIdentityDoesNotPanicOnVerify(t *testing.T) {
+	stored, stats := encode(t, testData(1000), newKey(t).Recipient())
+	dec, err := NewDecoder(bytes.NewReader(stored))
+	if err == nil {
+		t.Fatal("expected an error without identities")
+	}
+	if err := dec.VerifyStored(stats.StoredSHA256); err != nil {
+		t.Fatalf("VerifyStored = %v, want the checksum to match", err)
+	}
+}

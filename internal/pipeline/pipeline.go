@@ -139,10 +139,10 @@ type Decoder struct {
 // whether the stored bytes were damaged.
 func NewDecoder(src io.Reader, identities ...age.Identity) (*Decoder, error) {
 	d := &Decoder{stored: newTally(), raw: newTally()}
+	d.src = &tallyReader{t: d.stored, src: src}
 	if len(identities) == 0 {
 		return d, errors.New("no age identity given")
 	}
-	d.src = &tallyReader{t: d.stored, src: src}
 	ar, err := age.Decrypt(d.src, identities...)
 	if err != nil {
 		return d, fmt.Errorf("decrypt: %w", err)
