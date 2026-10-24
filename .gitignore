@@ -8,6 +8,7 @@ coverage.txt
 # local config and secrets
 .env
 config.yaml
+pg-backup.yaml
 !config.example.yaml
 *.age-key
 

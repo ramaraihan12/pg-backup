@@ -68,7 +68,7 @@ services:
       db:
         condition: service_healthy
     entrypoint: ["demodata"]
-    command: ["-url", "postgres://postgres:postgres@db:5432/pgbackup_demo", "-customers", "20000", "-orders", "80000", "-reset"]
+    command: ["-url", "postgres://postgres:${PGBACKUP_DB_PASSWORD:-postgres}@db:5432/pgbackup_demo", "-customers", "20000", "-orders", "80000", "-reset"]
 
 volumes:
   db-data:
