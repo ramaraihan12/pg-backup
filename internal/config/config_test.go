@@ -258,3 +258,24 @@ func TestAgeKeys(t *testing.T) {
 		t.Error("expected an error for a missing identity file")
 	}
 }
+
+func TestPasswordInYAMLURLIsRejected(t *testing.T) {
+	for _, body := range []string{
+		"database:\n  url: postgres://backup:hunter2@db:5432/toko_maju\n",
+		"verify:\n  scratch_url: postgres://admin:hunter2@db:5432/postgres\n",
+	} {
+		_, err := Load(writeFile(t, "c.yaml", body), env(nil))
+		if err == nil || !strings.Contains(err.Error(), "PGBACKUP_DB_PASSWORD") {
+			t.Errorf("Load(%q) = %v, want a password error", body, err)
+		}
+	}
+	// Through the environment it is allowed.
+	p := writeFile(t, "c.yaml", "database:\n  url: postgres://backup@db:5432/toko_maju\n")
+	c, err := Load(p, env(map[string]string{"PGBACKUP_DATABASE_URL": "postgres://backup:inline@db:5432/toko_maju"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := c.DatabaseURL(); !strings.Contains(got, "inline") {
+		t.Errorf("DatabaseURL = %q", got)
+	}
+}

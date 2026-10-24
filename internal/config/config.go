@@ -3,7 +3,8 @@
 // Plain settings can come from either place, and the environment wins.
 // Secrets (passwords, keys, tokens) are read from the environment only. The
 // YAML decoder rejects unknown keys, so a "password:" line in the file is an
-// error and not something that is silently ignored.
+// error, and so is a password inside a URL in the file. A URL given through
+// PGBACKUP_DATABASE_URL or PGBACKUP_VERIFY_URL may carry one.
 package config
 
 import (
@@ -178,6 +179,15 @@ func Load(path string, getenv func(string) string) (*Config, error) {
 		dec.KnownFields(true)
 		if err := dec.Decode(&c); err != nil && !errors.Is(err, io.EOF) {
 			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+	}
+	// Secrets only come from the environment, so a password inside a URL in
+	// the file is as wrong as a "password:" key.
+	for name, raw := range map[string]string{"database.url": c.Database.URL, "verify.scratch_url": c.Verify.ScratchURL} {
+		if u, err := url.Parse(raw); err == nil && u.User != nil {
+			if _, has := u.User.Password(); has {
+				return nil, fmt.Errorf("read %s: %s contains a password; set PGBACKUP_DB_PASSWORD instead", path, name)
+			}
 		}
 	}
 	for _, o := range overrides {
