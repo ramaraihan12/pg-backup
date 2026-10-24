@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -103,16 +104,31 @@ func ValidateSchedule(spec string) error {
 	return nil
 }
 
-// Serve blocks until ctx is cancelled. A run that is still going when the
-// next tick arrives is skipped, not stacked.
+// Serve blocks until ctx is cancelled, then waits for the run in progress, so
+// its cleanup (the drill drops its scratch database) finishes before the
+// process exits. A run that is still going when the next tick arrives, or
+// when --run-now fires, is skipped, not stacked.
 func Serve(ctx context.Context, o Options, job *Job) error {
 	if err := ValidateSchedule(o.Schedule); err != nil {
 		return err
 	}
 	log := job.Log
 	cl := cronLogger{log}
-	c := cron.New(cron.WithChain(cron.Recover(cl), cron.SkipIfStillRunning(cl)))
-	if _, err := c.AddFunc(o.Schedule, func() { _ = job.Run(ctx) }); err != nil {
+	c := cron.New(cron.WithChain(cron.Recover(cl)))
+
+	// One lock covers the cron ticks and the first run, and the wait group
+	// lets shutdown wait for whichever of them is running.
+	var running sync.Mutex
+	var wg sync.WaitGroup
+	run := func() {
+		if !running.TryLock() {
+			log.Warn("previous run is still going, skipping this one")
+			return
+		}
+		defer running.Unlock()
+		_ = job.Run(ctx)
+	}
+	if _, err := c.AddFunc(o.Schedule, run); err != nil {
 		return err
 	}
 
@@ -127,7 +143,11 @@ func Serve(ctx context.Context, o Options, job *Job) error {
 	c.Start()
 	log.Info("serving", "schedule", o.Schedule, "listen", o.Listen)
 	if o.RunNow {
-		go func() { _ = job.Run(ctx) }()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			run()
+		}()
 	}
 
 	select {
@@ -138,6 +158,7 @@ func Serve(ctx context.Context, o Options, job *Job) error {
 	}
 	log.Info("shutting down")
 	<-c.Stop().Done() // a running job sees the cancelled ctx and stops
+	wg.Wait()
 	sctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(sctx); err != nil {

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -190,6 +191,47 @@ func TestServeRunsOnStartAndStops(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("Serve did not stop")
+	}
+}
+
+// slowVerify stands in for a drill: when ctx is cancelled it still needs a
+// moment to drop its scratch database.
+type slowVerify struct {
+	started chan struct{}
+	cleaned atomic.Bool
+}
+
+func (f *slowVerify) Run(ctx context.Context, m *manifest.Manifest) *verify.Report {
+	close(f.started)
+	<-ctx.Done()
+	time.Sleep(300 * time.Millisecond)
+	f.cleaned.Store(true)
+	return &verify.Report{Backup: m, Failures: []string{"cancelled"}}
+}
+
+func TestServeWaitsForTheFirstRunToFinishItsCleanup(t *testing.T) {
+	v := &slowVerify{started: make(chan struct{})}
+	job, _, _ := newJob(&fakeBackup{}, v)
+	ctx, cancel := context.WithCancel(context.Background())
+	addr := freeAddr(t)
+	done := make(chan error, 1)
+	go func() {
+		done <- Serve(ctx, Options{Schedule: "0 3 * * *", Listen: addr, RunNow: true}, job)
+	}()
+
+	select {
+	case <-v.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the drill never started")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Serve did not stop")
+	}
+	if !v.cleaned.Load() {
+		t.Error("Serve returned before the drill finished its cleanup")
 	}
 }
 
