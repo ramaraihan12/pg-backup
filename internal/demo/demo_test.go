@@ -72,7 +72,7 @@ func TestMadeUpContactDetails(t *testing.T) {
 	if !strings.HasSuffix(c.email, "@contoh.test") {
 		t.Errorf("email %q should use a reserved test domain", c.email)
 	}
-	if !strings.HasPrefix(c.phone, "+62 8") {
+	if !strings.HasPrefix(c.phone, "+62 000-0000-") {
 		t.Errorf("phone %q", c.phone)
 	}
 }

@@ -199,11 +199,19 @@ func makeCustomer(p Params, id int64) customer {
 		id:       id,
 		name:     first + " " + last,
 		email:    fmt.Sprintf("%s.%s%d@contoh.test", lower(first), lower(last), id),
-		phone:    fmt.Sprintf("+62 8%02d-%04d-%04d", 11+r.IntN(80), r.IntN(10000), r.IntN(10000)),
+		phone:    fakePhone(r),
 		city:     c.name,
 		province: c.province,
 		joinedAt: endDate.Add(-time.Duration(r.Int64N(int64(span)))).Truncate(time.Second),
 	}
+}
+
+// fakePhone returns a number that cannot belong to a real person. An
+// Indonesian number never starts with 0 after +62, so "+62 000-0000-NNNN" is
+// not dialable. The generator avoids the real +62 8xx mobile format on
+// purpose, so no made-up customer can match someone's actual number.
+func fakePhone(r *rand.Rand) string {
+	return fmt.Sprintf("+62 000-0000-%04d", r.IntN(10000))
 }
 
 type product struct {
