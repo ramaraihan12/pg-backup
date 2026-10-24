@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -40,9 +42,19 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 
+			mt := metrics.New()
+			// Start from the newest backup in the bucket, so a restart does not
+			// look like "never backed up" until the next scheduled run.
+			if latest, err := cat.Resolve(cmd.Context(), "latest"); err == nil {
+				mt.Seed(latest.FinishedAt, time.Duration(latest.DurationSeconds*float64(time.Second)), latest.StoredBytes, latest.RawBytes)
+				a.log.Info("metrics start from the newest backup", "id", latest.ID)
+			} else if !errors.Is(err, backup.ErrNoBackups) {
+				a.log.Warn("could not read the newest backup for metrics", "error", err)
+			}
+
 			job := &serve.Job{
 				Backup:   &backup.Backuper{Catalog: cat, Tools: a.tools(), Recipients: rec, DatabaseURL: dsn, Log: a.log},
-				Metrics:  metrics.New(),
+				Metrics:  mt,
 				Notifier: notify.Nop{},
 				Log:      a.log,
 			}

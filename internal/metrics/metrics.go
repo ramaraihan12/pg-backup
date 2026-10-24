@@ -3,6 +3,7 @@ package metrics
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,6 +24,10 @@ type Metrics struct {
 	lastVerifyDur  prometheus.Gauge
 	runs           *prometheus.CounterVec
 	verifyRuns     *prometheus.CounterVec
+
+	// The drill gauges are registered by the first drill, so after a restart
+	// they are absent and not a misleading 0 ("the drill failed").
+	verifyOnce sync.Once
 }
 
 // New registers all metrics.
@@ -44,8 +49,7 @@ func New() *Metrics {
 		verifyRuns: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "pg_backup_verify_runs_total", Help: "Restore drills by result."}, []string{"result"}),
 	}
-	m.reg.MustRegister(m.lastSuccess, m.lastDuration, m.lastStored, m.lastRaw,
-		m.lastVerifyOK, m.lastVerifyTime, m.lastVerifyDur, m.runs, m.verifyRuns)
+	m.reg.MustRegister(m.lastSuccess, m.lastDuration, m.lastStored, m.lastRaw, m.runs, m.verifyRuns)
 	// Make the counters appear at 0 so rate() and absent() alerts work from the start.
 	for _, r := range []string{"success", "failure"} {
 		m.runs.WithLabelValues(r)
@@ -68,11 +72,24 @@ func (m *Metrics) BackupSucceeded(at time.Time, took time.Duration, storedBytes,
 	m.runs.WithLabelValues("success").Inc()
 }
 
+// Seed sets the last-backup gauges from a backup that already exists, so a
+// restart does not make the newest backup look like it never happened. It
+// does not count as a run.
+func (m *Metrics) Seed(at time.Time, took time.Duration, storedBytes, rawBytes int64) {
+	m.lastSuccess.Set(float64(at.Unix()))
+	m.lastDuration.Set(took.Seconds())
+	m.lastStored.Set(float64(storedBytes))
+	m.lastRaw.Set(float64(rawBytes))
+}
+
 // BackupFailed counts a failed backup. The last-success gauges keep their old values.
 func (m *Metrics) BackupFailed() { m.runs.WithLabelValues("failure").Inc() }
 
 // Verified records a restore drill.
 func (m *Metrics) Verified(at time.Time, took time.Duration, ok bool) {
+	m.verifyOnce.Do(func() {
+		m.reg.MustRegister(m.lastVerifyOK, m.lastVerifyTime, m.lastVerifyDur)
+	})
 	v, result := 0.0, "failure"
 	if ok {
 		v, result = 1, "success"

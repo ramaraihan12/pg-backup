@@ -55,3 +55,22 @@ func TestMetricsOutput(t *testing.T) {
 		t.Error("failed drill should set the gauge to 0")
 	}
 }
+
+func TestSeedAndUnsetDrillGauges(t *testing.T) {
+	m := New()
+	m.Seed(time.Unix(1_800_000_000, 0), 5*time.Second, 10, 40)
+	out := scrape(t, m)
+	for _, want := range []string{
+		"pg_backup_last_success_timestamp_seconds 1.8e+09",
+		"pg_backup_last_size_bytes 10",
+		`pg_backup_runs_total{result="success"} 0`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// No drill has run in this process, so the drill gauges must be absent.
+	if strings.Contains(out, "pg_backup_last_verify_success") {
+		t.Errorf("drill gauges should be absent before the first drill:\n%s", out)
+	}
+}
