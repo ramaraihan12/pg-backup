@@ -3,6 +3,7 @@ package backup
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/ramaraihan12/pg-backup/internal/manifest"
 	"github.com/ramaraihan12/pg-backup/internal/pg"
 	"github.com/ramaraihan12/pg-backup/internal/pipeline"
+	"github.com/ramaraihan12/pg-backup/internal/store"
 )
 
 // Backuper takes one backup.
@@ -45,6 +47,15 @@ func (b *Backuper) Run(ctx context.Context) (*manifest.Manifest, error) {
 	started := now()
 	id := manifest.NewID(started)
 	objectKey := manifest.ObjectKey(c.Prefix, c.Database, id)
+
+	// Ids have one-second resolution. Two backups started in the same second
+	// would overwrite each other, so refuse instead of losing one silently.
+	if rc, err := c.Store.Get(ctx, manifest.ManifestKey(c.Prefix, c.Database, id)); err == nil {
+		rc.Close()
+		return nil, fmt.Errorf("a backup with id %s already exists (another run started in the same second), try again", id)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, fmt.Errorf("check for an existing backup: %w", err)
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

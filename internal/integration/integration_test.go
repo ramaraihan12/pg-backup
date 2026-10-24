@@ -410,3 +410,22 @@ func TestS3Store(t *testing.T) {
 		t.Errorf("deleting a missing key: %v", err)
 	}
 }
+
+func TestSameSecondBackupIsRefused(t *testing.T) {
+	e := newEnv(t, demo.Small())
+	ctx := context.Background()
+	at := time.Date(2026, 10, 23, 3, 0, 0, 0, time.UTC)
+	b := e.backuper(func() time.Time { return at })
+	first, err := b.Run(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(ctx); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("second backup in the same second = %v, want an 'already exists' error", err)
+	}
+	// The first backup must be untouched.
+	l, err := e.cat.List(ctx)
+	if err != nil || len(l.Backups) != 1 || l.Backups[0].Checksum != first.Checksum || len(l.Problems) != 0 {
+		t.Errorf("list = %+v, %v", l, err)
+	}
+}
