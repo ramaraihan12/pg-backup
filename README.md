@@ -77,6 +77,33 @@ dry run, nothing is deleted (add --yes to delete): keep 7 daily, 4 weekly, 6 mon
 
 Go 1.27.3, cobra 1.10, klauspost/compress 1.20 (zstd), age 1.3 (filippo.io/age), minio-go 7.4, pgx 5.11, robfig/cron 3, prometheus client_golang 1.25, testcontainers-go 0.44, staticcheck, PostgreSQL 17 client tools and MinIO.
 
+## Install
+
+Every [release](https://github.com/ramaraihan12/pg-backup/releases) has binaries for Linux, macOS and Windows on amd64 and arm64, so you don't need Go. On Linux or macOS:
+
+```bash
+os=$(uname -s | tr '[:upper:]' '[:lower:]')
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+url=https://github.com/ramaraihan12/pg-backup/releases/latest/download
+curl -fsSLO "$url/pg-backup_${os}_${arch}.tar.gz"
+curl -fsSLO "$url/checksums.txt"
+sha256sum --ignore-missing -c checksums.txt     # macOS: shasum -a 256 --ignore-missing -c checksums.txt
+tar -xzf "pg-backup_${os}_${arch}.tar.gz" pg-backup
+sudo mv pg-backup /usr/local/bin/
+pg-backup --version
+```
+
+On Windows, in PowerShell:
+
+```powershell
+$url = "https://github.com/ramaraihan12/pg-backup/releases/latest/download"
+Invoke-WebRequest "$url/pg-backup_windows_amd64.zip" -OutFile pg-backup.zip
+Expand-Archive pg-backup.zip pg-backup
+.\pg-backup\pg-backup.exe --version
+```
+
+The binary doesn't include Postgres, so `pg_dump` and `pg_restore` 17 still have to be on `PATH`. On Windows `PATH` is the only way, because `PGBACKUP_PG_BIN_DIR` looks for `pg_dump` without the `.exe`. Each archive also has `config.example.yaml`. CI only runs on Linux, so the macOS and Windows builds get less testing.
+
 ## Run it
 
 You need Docker. Go is only needed to build outside the container.
@@ -92,7 +119,7 @@ docker compose exec pg-backup pg-backup verify
 
 Compose publishes Postgres (5442), MinIO (9010, console 9011) and metrics (9187) on `127.0.0.1` only. The `pg-backup` service runs `serve` with the schedule in `config.example.yaml` (03:00 daily); add `--run-now` to also run once at start. `curl -s localhost:9187/metrics | grep ^pg_backup` shows what that process has run, not the `exec` runs above.
 
-Without Docker, build with `go build ./cmd/pg-backup`, copy `config.example.yaml` to `pg-backup.yaml` (it points at the compose database) and have `pg_dump` and `pg_restore` 17 on `PATH`. `list`, `prune --yes` and `restore --to <url> [--id <id>]` (into an existing, empty database) are the other commands.
+Without Docker, install a release binary or build with `go build ./cmd/pg-backup`, copy `config.example.yaml` to `pg-backup.yaml` (it points at the compose database) and have `pg_dump` and `pg_restore` 17 on `PATH`. `list`, `prune --yes` and `restore --to <url> [--id <id>]` (into an existing, empty database) are the other commands.
 
 Secrets come only from the environment: a `password:` key or a password inside a URL in the YAML is an error. Main settings, all overridable by env var (`PGBACKUP_DB_PASSWORD` fills a URL that has no password):
 
