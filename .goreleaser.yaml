@@ -1,0 +1,35 @@
+version: 2
+
+project_name: pg-backup
+
+builds:
+  - main: ./cmd/pg-backup
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  # No version in the name, so the releases/latest/download links in the README
+  # keep working after the next release.
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - config.example.yaml
+
+checksum:
+  name_template: checksums.txt
+
+# Release notes are written by hand in a draft named after the tag. The workflow
+# fills that draft and publishes it. Without one it lists the commits instead.
+release:
+  use_existing_draft: true
