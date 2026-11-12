@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -23,9 +24,10 @@ type Tools struct {
 
 func (t Tools) bin(name string) (string, error) {
 	if t.BinDir != "" {
-		p := filepath.Join(t.BinDir, name)
+		exe := exeName(runtime.GOOS, name)
+		p := filepath.Join(t.BinDir, exe)
 		if _, err := os.Stat(p); err != nil {
-			return "", fmt.Errorf("%s not found in %s", name, t.BinDir)
+			return "", fmt.Errorf("%s not found in %s", exe, t.BinDir)
 		}
 		return p, nil
 	}
@@ -34,6 +36,14 @@ func (t Tools) bin(name string) (string, error) {
 		return "", fmt.Errorf("%s not found on PATH: install the Postgres 17 client tools or set postgres.bin_dir", name)
 	}
 	return p, nil
+}
+
+// exeName is the file name of a client tool on goos. Windows needs the .exe.
+func exeName(goos, name string) string {
+	if goos == "windows" {
+		return name + ".exe"
+	}
+	return name
 }
 
 // Version returns the version number of a client tool, for example "17.11".

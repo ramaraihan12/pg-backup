@@ -1,6 +1,9 @@
 package pg
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -67,8 +70,42 @@ func TestTailKeepsTheEnd(t *testing.T) {
 }
 
 func TestToolsMissingBinary(t *testing.T) {
-	if _, err := (Tools{BinDir: t.TempDir()}).bin("pg_dump"); err == nil {
+	dir := t.TempDir()
+	_, err := (Tools{BinDir: dir}).bin("pg_dump")
+	if err == nil {
 		t.Fatal("expected an error")
+	}
+	// The error names the file it looked for and where.
+	if exe := exeName(runtime.GOOS, "pg_dump"); !strings.Contains(err.Error(), exe+" not found in "+dir) {
+		t.Errorf("error %q does not name %s in %s", err, exe, dir)
+	}
+}
+
+func TestExeName(t *testing.T) {
+	for goos, want := range map[string]string{
+		"windows": "pg_dump.exe",
+		"linux":   "pg_dump",
+		"darwin":  "pg_dump",
+	} {
+		if got := exeName(goos, "pg_dump"); got != want {
+			t.Errorf("exeName(%q) = %q, want %q", goos, got, want)
+		}
+	}
+}
+
+func TestToolsFindsBinaryInBinDir(t *testing.T) {
+	// pg_dump.exe on Windows, pg_dump everywhere else.
+	dir := t.TempDir()
+	want := filepath.Join(dir, exeName(runtime.GOOS, "pg_dump"))
+	if err := os.WriteFile(want, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (Tools{BinDir: dir}).bin("pg_dump")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
 	}
 }
 

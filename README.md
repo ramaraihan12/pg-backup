@@ -102,7 +102,7 @@ Expand-Archive pg-backup.zip pg-backup
 .\pg-backup\pg-backup.exe --version
 ```
 
-The binary doesn't include Postgres, so `pg_dump` and `pg_restore` 17 still have to be on `PATH`. On Windows `PATH` is the only way, because `PGBACKUP_PG_BIN_DIR` looks for `pg_dump` without the `.exe`. Each archive also has `config.example.yaml`. CI only runs on Linux, so the macOS and Windows builds get less testing.
+The binary doesn't include Postgres, so `pg_dump` and `pg_restore` 17 have to be on `PATH`, or in the folder named by `PGBACKUP_PG_BIN_DIR`. Both work on Windows, where that folder is usually `C:\Program Files\PostgreSQL\17\bin`. Each archive also has `config.example.yaml`. CI only runs on Linux, so the macOS and Windows builds get less testing.
 
 ## Run it
 
